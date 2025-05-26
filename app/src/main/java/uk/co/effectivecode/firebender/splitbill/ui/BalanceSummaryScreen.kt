@@ -21,6 +21,8 @@ fun BalanceSummaryScreen(
     receiptWithSplitting: EditableReceiptWithSplitting,
     onBackToSplitting: () -> Unit,
     onExitSplitting: () -> Unit,
+    onDesignatePayer: (String) -> Unit,
+    onClearPayer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val summary = receiptWithSplitting.billSplitSummary
@@ -59,11 +61,30 @@ fun BalanceSummaryScreen(
             )
         }
         
+        // Payer Selection
+        if (summary.participants.isNotEmpty()) {
+            item {
+                PayerSelectionCard(
+                    participants = summary.participants,
+                    selectedPayerId = summary.payerId,
+                    onDesignatePayer = onDesignatePayer,
+                    onClearPayer = onClearPayer
+                )
+            }
+        }
+        
+        // Payment Summary (if payer is selected)
+        summary.paymentSummary?.let { paymentSummary ->
+            item {
+                PaymentSummaryCard(paymentSummary = paymentSummary)
+            }
+        }
+        
         // Individual Balances
         if (summary.balances.isNotEmpty()) {
             item {
                 Text(
-                    text = "Individual Balances",
+                    text = if (summary.payerId != null) "Bill Breakdown" else "Individual Balances",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(vertical = 8.dp)
@@ -71,7 +92,10 @@ fun BalanceSummaryScreen(
             }
             
             items(summary.balances) { balance ->
-                ParticipantBalanceCard(balance = balance)
+                ParticipantBalanceCard(
+                    balance = balance,
+                    isPayer = balance.participant.id == summary.payerId
+                )
             }
         }
         
@@ -177,7 +201,191 @@ fun OverallSummaryCard(
 }
 
 @Composable
-fun ParticipantBalanceCard(balance: ParticipantBalance) {
+fun PayerSelectionCard(
+    participants: List<Participant>,
+    selectedPayerId: String?,
+    onDesignatePayer: (String) -> Unit,
+    onClearPayer: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Designate Payer",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            if (selectedPayerId != null) {
+                val selectedPayer = participants.find { it.id == selectedPayerId }
+                selectedPayer?.let {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${it.name} is paying the bill",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = onClearPayer) {
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                contentDescription = "Clear Payer",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = "No payer designated. Select a participant to pay the bill.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                LazyColumn(
+                    modifier = Modifier.height(150.dp)
+                ) {
+                    items(participants) { participant ->
+                        Button(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            onClick = { onDesignatePayer(participant.id) }
+                        ) {
+                            Text(text = participant.name)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PaymentSummaryCard(paymentSummary: PaymentSummary) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Payment Summary",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Total Bill",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Text(
+                    text = "£%.2f".format(paymentSummary.totalBillAmount),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Payer's Share",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Text(
+                    text = "£%.2f".format(paymentSummary.payerOwes),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Owed by Others",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Text(
+                    text = "£%.2f".format(paymentSummary.payments.sumOf { it.amount }),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+            
+            if (paymentSummary.payments.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Divider()
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Payment Breakdown",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                paymentSummary.payments.forEach { payment ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "${payment.from.name} → ${payment.to.name}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Text(
+                            text = "£%.2f".format(payment.amount),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ParticipantBalanceCard(balance: ParticipantBalance, isPayer: Boolean) {
     Card(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -196,7 +404,7 @@ fun ParticipantBalanceCard(balance: ParticipantBalance) {
                     Icon(
                         Icons.Default.Person,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = if (isPayer) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -204,12 +412,20 @@ fun ParticipantBalanceCard(balance: ParticipantBalance) {
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
+                    if (isPayer) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "(Payer)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
                 Text(
                     text = "£%.2f".format(balance.total),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = if (balance.total > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )
             }
             

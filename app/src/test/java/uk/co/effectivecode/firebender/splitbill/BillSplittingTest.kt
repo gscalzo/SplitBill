@@ -374,4 +374,100 @@ class BillSplittingTest {
         assertEquals(16.50, fixedReceipt.calculation.expectedTotal, 0.01)
         assertEquals(16.50, fixedReceipt.calculation.actualTotal, 0.01)
     }
+
+    @Test
+    fun `designatePayer sets payerId in BillSplitSummary`() {
+        // Given
+        val receiptWithSplitting = EditableReceiptWithSplitting.fromEditableReceipt(createSampleReceipt())
+            .addParticipant("Alice")
+            .addParticipant("Bob")
+        
+        val aliceId = receiptWithSplitting.participants[0].id
+        
+        // When
+        val updated = receiptWithSplitting.designatePayer(aliceId)
+        
+        // Then
+        assertEquals(aliceId, updated.billSplitSummary.payerId)
+        assertNotNull(updated.billSplitSummary.paymentSummary)
+        assertEquals("Alice", updated.billSplitSummary.paymentSummary?.payer?.name)
+    }
+
+    @Test
+    fun `clearPayer removes payerId and paymentSummary`() {
+        // Given
+        val receiptWithSplitting = EditableReceiptWithSplitting.fromEditableReceipt(createSampleReceipt())
+            .addParticipant("Alice")
+            .designatePayer(Participant.create("Alice").id) // Set initial payer
+        
+        // When
+        val updated = receiptWithSplitting.clearPayer()
+        
+        // Then
+        assertNull(updated.billSplitSummary.payerId)
+        assertNull(updated.billSplitSummary.paymentSummary)
+    }
+
+    @Test
+    fun `removeParticipant clears payer if they were the payer`() {
+        // Given
+        val receiptWithSplitting = EditableReceiptWithSplitting.fromEditableReceipt(createSampleReceipt())
+            .addParticipant("Alice")
+        val aliceId = receiptWithSplitting.participants[0].id
+        val withPayer = receiptWithSplitting.designatePayer(aliceId)
+        
+        // When
+        val updated = withPayer.removeParticipant(aliceId)
+        
+        // Then
+        assertTrue(updated.participants.isEmpty())
+        assertNull(updated.billSplitSummary.payerId)
+        assertNull(updated.billSplitSummary.paymentSummary)
+    }
+
+    @Test
+    fun `paymentSummary calculates payments correctly`() {
+        // Given - Alice pays for all, Bob and Charlie owe Alice
+        val receiptWithSplitting = EditableReceiptWithSplitting.fromEditableReceipt(createSampleReceipt())
+            .addParticipant("Alice")
+            .addParticipant("Bob")
+            .addParticipant("Charlie")
+        
+        val alice = receiptWithSplitting.participants[0]
+        val bob = receiptWithSplitting.participants[1]
+        val charlie = receiptWithSplitting.participants[2]
+        
+        val updated = receiptWithSplitting
+            .assignItemToEqualSplit(0, listOf(alice.id, bob.id, charlie.id)) // Pizza (20) split 3 ways
+            .assignItemToEqualSplit(1, listOf(alice.id, bob.id, charlie.id)) // Salad (8) split 3 ways
+            .assignItemToEqualSplit(2, listOf(alice.id, bob.id, charlie.id)) // Drinks (9) split 3 ways
+            .designatePayer(alice.id)
+        
+        // Each person owes 37.00 (total) / 3 = 12.33 subtotal
+        // Service is 3.70 / 3 = 1.23 per person
+        // Total per person = 13.56
+        
+        // When
+        val paymentSummary = updated.billSplitSummary.paymentSummary
+        
+        // Then
+        assertNotNull(paymentSummary)
+        assertEquals(alice.id, paymentSummary!!.payer.id)
+        assertEquals(40.70, paymentSummary.totalBillAmount, 0.01) // (20+8+9) + 3.70 service
+        assertEquals(13.57, paymentSummary.payerOwes, 0.01) // Alice's share including rounding
+        
+        assertEquals(2, paymentSummary.payments.size)
+        val bobPayment = paymentSummary.payments.find { it.from.id == bob.id }
+        val charliePayment = paymentSummary.payments.find { it.from.id == charlie.id }
+        
+        assertNotNull(bobPayment)
+        assertEquals(bob.id, bobPayment!!.from.id)
+        assertEquals(alice.id, bobPayment.to.id)
+        assertEquals(13.57, bobPayment.amount, 0.01) // Bob's share including rounding
+        
+        assertNotNull(charliePayment)
+        assertEquals(charlie.id, charliePayment!!.from.id)
+        assertEquals(alice.id, charliePayment.to.id)
+        assertEquals(13.56, charliePayment.amount, 0.01) // Charlie's share
+    }
 }

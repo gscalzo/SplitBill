@@ -242,13 +242,18 @@ data class BillSplitSummary(
     val balances: List<ParticipantBalance>,
     val totalAssigned: Double,
     val totalUnassigned: Double,
-    val isFullyAssigned: Boolean
+    val isFullyAssigned: Boolean,
+    val payerId: String? = null
 ) {
+    val paymentSummary: PaymentSummary?
+        get() = payerId?.let { PaymentSummary.calculate(participants, balances, it) }
+
     companion object {
         fun calculate(
             participants: List<Participant>,
             assignedItems: List<AssignedReceiptItem>,
-            serviceCharge: Double
+            serviceCharge: Double,
+            payerId: String? = null
         ): BillSplitSummary {
             val balances = participants.map { participant ->
                 calculateParticipantBalance(participant, assignedItems, serviceCharge, participants.size)
@@ -264,7 +269,8 @@ data class BillSplitSummary(
                 balances = balances,
                 totalAssigned = totalAssigned,
                 totalUnassigned = totalUnassigned,
-                isFullyAssigned = isFullyAssigned
+                isFullyAssigned = isFullyAssigned,
+                payerId = payerId
             )
         }
         
@@ -317,6 +323,50 @@ data class BillSplitSummary(
     }
 }
 
+data class PaymentSummary(
+    val payer: Participant,
+    val totalBillAmount: Double,
+    val payerOwes: Double,
+    val payments: List<Payment>
+) {
+    companion object {
+        fun calculate(
+            participants: List<Participant>,
+            balances: List<ParticipantBalance>,
+            payerId: String
+        ): PaymentSummary? {
+            val payer = participants.find { it.id == payerId } ?: return null
+            val payerBalance = balances.find { it.participant.id == payerId } ?: return null
+            
+            val totalBillAmount = balances.sumOf { it.total }
+            val payerOwes = payerBalance.total
+            
+            val payments = balances
+                .filter { it.participant.id != payerId && it.total > 0 }
+                .map { balance ->
+                    Payment(
+                        from = balance.participant,
+                        to = payer,
+                        amount = balance.total
+                    )
+                }
+            
+            return PaymentSummary(
+                payer = payer,
+                totalBillAmount = totalBillAmount,
+                payerOwes = payerOwes,
+                payments = payments
+            )
+        }
+    }
+}
+
+data class Payment(
+    val from: Participant,
+    val to: Participant,
+    val amount: Double
+)
+
 data class EditableReceiptWithSplitting(
     val editableReceipt: EditableReceipt,
     val participants: List<Participant>,
@@ -343,7 +393,7 @@ data class EditableReceiptWithSplitting(
     fun addParticipant(name: String): EditableReceiptWithSplitting {
         val newParticipant = Participant.create(name)
         val updatedParticipants = participants + newParticipant
-        val updatedSummary = BillSplitSummary.calculate(updatedParticipants, assignedItems, editableReceipt.serviceCharge)
+        val updatedSummary = BillSplitSummary.calculate(updatedParticipants, assignedItems, editableReceipt.serviceCharge, billSplitSummary.payerId)
         
         return copy(
             participants = updatedParticipants,
@@ -374,7 +424,9 @@ data class EditableReceiptWithSplitting(
                 ItemAssignment.Unassigned -> assignedItem
             }
         }
-        val updatedSummary = BillSplitSummary.calculate(updatedParticipants, updatedAssignedItems, editableReceipt.serviceCharge)
+        // Clear payer if the removed participant was the payer
+        val updatedPayerId = if (billSplitSummary.payerId == participantId) null else billSplitSummary.payerId
+        val updatedSummary = BillSplitSummary.calculate(updatedParticipants, updatedAssignedItems, editableReceipt.serviceCharge, updatedPayerId)
         
         return copy(
             participants = updatedParticipants,
@@ -390,7 +442,7 @@ data class EditableReceiptWithSplitting(
         updatedAssignedItems[itemIndex] = updatedAssignedItems[itemIndex].copy(
             assignment = ItemAssignment.IndividualAssignment(participantId)
         )
-        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, editableReceipt.serviceCharge)
+        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, editableReceipt.serviceCharge, billSplitSummary.payerId)
         
         return copy(
             assignedItems = updatedAssignedItems,
@@ -409,7 +461,7 @@ data class EditableReceiptWithSplitting(
                 ItemAssignment.EqualSplit(participantIds)
             }
         )
-        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, editableReceipt.serviceCharge)
+        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, editableReceipt.serviceCharge, billSplitSummary.payerId)
         
         return copy(
             assignedItems = updatedAssignedItems,
@@ -423,7 +475,7 @@ data class EditableReceiptWithSplitting(
         if (itemIndex >= 0 && itemIndex < updatedAssignedItems.size) {
             updatedAssignedItems[itemIndex] = updatedAssignedItems[itemIndex].copy(receiptItem = newItem)
         }
-        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, updatedEditableReceipt.serviceCharge)
+        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, updatedEditableReceipt.serviceCharge, billSplitSummary.payerId)
         
         return copy(
             editableReceipt = updatedEditableReceipt,
@@ -435,7 +487,7 @@ data class EditableReceiptWithSplitting(
     fun addReceiptItem(item: ReceiptItem): EditableReceiptWithSplitting {
         val updatedEditableReceipt = editableReceipt.addItem(item)
         val updatedAssignedItems = assignedItems + AssignedReceiptItem(item, ItemAssignment.Unassigned)
-        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, updatedEditableReceipt.serviceCharge)
+        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, updatedEditableReceipt.serviceCharge, billSplitSummary.payerId)
         
         return copy(
             editableReceipt = updatedEditableReceipt,
@@ -450,12 +502,22 @@ data class EditableReceiptWithSplitting(
         if (itemIndex >= 0 && itemIndex < updatedAssignedItems.size) {
             updatedAssignedItems.removeAt(itemIndex)
         }
-        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, updatedEditableReceipt.serviceCharge)
+        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, updatedEditableReceipt.serviceCharge, billSplitSummary.payerId)
         
         return copy(
             editableReceipt = updatedEditableReceipt,
             assignedItems = updatedAssignedItems,
             billSplitSummary = updatedSummary
         )
+    }
+    
+    fun designatePayer(payerId: String): EditableReceiptWithSplitting {
+        val updatedSummary = BillSplitSummary.calculate(participants, assignedItems, editableReceipt.serviceCharge, payerId)
+        return copy(billSplitSummary = updatedSummary)
+    }
+    
+    fun clearPayer(): EditableReceiptWithSplitting {
+        val updatedSummary = BillSplitSummary.calculate(participants, assignedItems, editableReceipt.serviceCharge, null)
+        return copy(billSplitSummary = updatedSummary)
     }
 }

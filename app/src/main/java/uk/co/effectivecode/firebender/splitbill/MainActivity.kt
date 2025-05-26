@@ -218,7 +218,10 @@ fun MainScreen(
                 BalanceSummaryScreen(
                     receiptWithSplitting = currentState.receiptWithSplitting,
                     onBackToSplitting = { viewModel.backToSplitting() },
-                    onExitSplitting = { viewModel.exitSplittingMode() }
+                    onExitSplitting = { viewModel.exitSplittingMode() },
+                    onDesignatePayer = { payerId -> viewModel.designatePayer(payerId) },
+                    onClearPayer = { viewModel.clearPayer() },
+                    modifier = Modifier.padding(16.dp)
                 )
             }
         }

@@ -170,6 +170,40 @@ class ReceiptViewModel(
         }
     }
     
+    fun designatePayer(payerId: String) {
+        val currentState = _uiState.value
+        when (currentState) {
+            is ReceiptUiState.SplittingMode -> {
+                val updatedReceiptWithSplitting = currentState.receiptWithSplitting.designatePayer(payerId)
+                _uiState.value = ReceiptUiState.SplittingMode(updatedReceiptWithSplitting)
+            }
+            is ReceiptUiState.BalanceSummary -> {
+                val updatedReceiptWithSplitting = currentState.receiptWithSplitting.designatePayer(payerId)
+                _uiState.value = ReceiptUiState.BalanceSummary(updatedReceiptWithSplitting)
+            }
+            else -> {
+                // No action for other states
+            }
+        }
+    }
+    
+    fun clearPayer() {
+        val currentState = _uiState.value
+        when (currentState) {
+            is ReceiptUiState.SplittingMode -> {
+                val updatedReceiptWithSplitting = currentState.receiptWithSplitting.clearPayer()
+                _uiState.value = ReceiptUiState.SplittingMode(updatedReceiptWithSplitting)
+            }
+            is ReceiptUiState.BalanceSummary -> {
+                val updatedReceiptWithSplitting = currentState.receiptWithSplitting.clearPayer()
+                _uiState.value = ReceiptUiState.BalanceSummary(updatedReceiptWithSplitting)
+            }
+            else -> {
+                // No action for other states
+            }
+        }
+    }
+    
     fun retry() {
         _uiState.value = ReceiptUiState.Initial
     }
