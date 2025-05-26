@@ -44,6 +44,7 @@ The app uses the actual OpenAI API by default with:
 - **Structured JSON output** for reliable parsing
 - **Full image quality** for better OCR accuracy
 - **Comprehensive error handling** for network issues
+- **Advanced receipt parsing** with left-to-right item-price matching
 
 ### Testing Mode
 

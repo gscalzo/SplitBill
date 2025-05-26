@@ -105,6 +105,13 @@ class OpenAIService(
                             text = """
                                 Analyze this image to determine if it's a UK expense receipt. 
                                 
+                                PARSING METHODOLOGY:
+                                1. First, identify the location of the items section on the receipt
+                                2. Locate the items listed vertically on the left side of the receipt
+                                3. Find the corresponding prices for each item on the right side
+                                4. Match each item to its price by going through them in order from top to bottom
+                                5. Look for quantity indicators before item names (e.g., "2x", "3 ", "2 ×")
+                                
                                 You must always return a JSON object with ALL four fields: error, items, service, total
                                 
                                 If it is NOT a valid receipt or the image is unclear:
@@ -113,20 +120,31 @@ class OpenAIService(
                                 If it IS a valid UK receipt:
                                 {"error": null, "items": [{"name": "Pizza", "quantity": 2, "cost": 20.00}, {"name": "Espresso", "quantity": 3, "cost": 9.00}], "service": 2.90, "total": 31.90}
                                 
-                                Rules for parsing items:
-                                - Look for quantity indicators like "2x Pizza", "3 Espresso", "2 × Item"
+                                ITEM PARSING RULES:
+                                - Scan the receipt from top to bottom
+                                - Items are typically listed on the left, prices on the right
+                                - Look for quantity indicators: "2x Pizza", "3 Espresso", "2 × Item"
                                 - If no quantity is specified, default to 1
                                 - The cost should be the TOTAL cost for that quantity
-                                - Examples:
-                                  * "2 Pizza £20" → {"name": "Pizza", "quantity": 2, "cost": 20.00}
-                                  * "Espresso £3" → {"name": "Espresso", "quantity": 1, "cost": 3.00}
-                                  * "3x Coffee £9" → {"name": "Coffee", "quantity": 3, "cost": 9.00}
+                                - Ignore section headers like "FOOD", "DRINKS", etc.
+                                - Skip non-item lines like date, payment method, etc.
                                 
-                                General rules:
+                                EXAMPLES:
+                                Receipt line: "2 Margherita Pizza        £20.00"
+                                → {"name": "Margherita Pizza", "quantity": 2, "cost": 20.00}
+                                
+                                Receipt line: "Espresso                  £3.00"
+                                → {"name": "Espresso", "quantity": 1, "cost": 3.00}
+                                
+                                Receipt line: "3x Americano              £9.00"
+                                → {"name": "Americano", "quantity": 3, "cost": 9.00}
+                                
+                                GENERAL RULES:
                                 - Always include all four fields (error, items, service, total)
                                 - Use null for fields that don't apply
                                 - Use British pound values as numbers (e.g., 12.50 not "£12.50")
-                                - If no service charge, set service to null
+                                - Service charge may be labeled as "Service", "Service Charge", "Tip", etc.
+                                - Total is usually at the bottom and may be labeled "Total", "Amount Due", etc.
                             """.trimIndent()
                         ),
                         MessageContent(
