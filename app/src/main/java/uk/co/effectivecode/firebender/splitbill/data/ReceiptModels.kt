@@ -521,3 +521,20 @@ data class EditableReceiptWithSplitting(
         return copy(billSplitSummary = updatedSummary)
     }
 }
+
+// Event Persistence Models
+
+data class BillEvent(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    var name: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val receiptWithSplitting: EditableReceiptWithSplitting // Contains all data needed
+)
+
+interface EventRepository {
+    suspend fun saveEvent(event: BillEvent): Result<Unit>
+    suspend fun getAllEvents(): Result<List<BillEvent>>
+    suspend fun getEventById(id: String): Result<BillEvent?>
+    suspend fun updateEventName(id: String, newName: String): Result<Unit>
+    suspend fun deleteEvent(id: String): Result<Unit>
+}

@@ -31,8 +31,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.io.File
 import kotlinx.coroutines.launch
-import uk.co.effectivecode.firebender.splitbill.data.ReceiptItem
-import uk.co.effectivecode.firebender.splitbill.data.ReceiptParseResult
+import uk.co.effectivecode.firebender.splitbill.data.*
 import uk.co.effectivecode.firebender.splitbill.service.OpenAIService
 import uk.co.effectivecode.firebender.splitbill.service.ReceiptParsingService
 import uk.co.effectivecode.firebender.splitbill.ui.theme.SplitBillTheme
@@ -58,7 +57,8 @@ fun MainApp() {
     
     // Create ViewModel with dependency injection
     val receiptService: ReceiptParsingService = remember { OpenAIService(useMock = false) }
-    val viewModel: ReceiptViewModel = viewModel { ReceiptViewModel(receiptService) }
+    val eventRepository: EventRepository = remember { FileEventRepository(context) }
+    val viewModel: ReceiptViewModel = viewModel { ReceiptViewModel(receiptService, eventRepository) }
     
     // Create a temporary file for camera capture
     val photoFile = remember {
@@ -98,34 +98,52 @@ fun MainApp() {
         }
     }
     
+    val mainScreenState by viewModel.mainScreenState.collectAsState()
+    
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(text = stringResource(id = R.string.app_name))
+                    Text(text = when (mainScreenState) {
+                        is MainScreenState.EventList -> stringResource(id = R.string.app_name)
+                        is MainScreenState.CreateNewBill -> stringResource(id = R.string.new_bill)
+                        is MainScreenState.ViewEvent -> stringResource(id = R.string.event_details)
+                    })
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showImageSourceDialog = true },
-                modifier = Modifier
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Receipt")
-            }
         }
     ) { innerPadding ->
-        MainScreen(
-            viewModel = viewModel,
-            modifier = Modifier.padding(innerPadding)
-        )
+        when (mainScreenState) {
+            is MainScreenState.EventList -> {
+                EventListContent(
+                    viewModel = viewModel,
+                    onCreateNewBill = {
+                        viewModel.navigateToCreateNewBill()
+                        showImageSourceDialog = true
+                    },
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
+            is MainScreenState.CreateNewBill -> {
+                CreateNewBillContent(
+                    viewModel = viewModel,
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
+            is MainScreenState.ViewEvent -> {
+                ViewEventContent(
+                    viewModel = viewModel,
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
+        }
         
         // Image source chooser dialog
         if (showImageSourceDialog) {
             AlertDialog(
                 onDismissRequest = { showImageSourceDialog = false },
-                title = { Text("Add Receipt") },
-                text = { Text("Choose how to add a receipt photo") },
+                title = { Text(stringResource(R.string.add_receipt)) },
+                text = { Text(stringResource(R.string.choose_how_to_add_receipt)) },
                 confirmButton = {
                     TextButton(
                         onClick = {
@@ -140,7 +158,7 @@ fun MainApp() {
                             }
                         }
                     ) {
-                        Text("Take Photo")
+                        Text(stringResource(R.string.take_photo))
                     }
                 },
                 dismissButton = {
@@ -150,7 +168,7 @@ fun MainApp() {
                             galleryLauncher.launch("image/*")
                         }
                     ) {
-                        Text("Choose from Gallery")
+                        Text(stringResource(R.string.choose_from_gallery))
                     }
                 }
             )
@@ -159,14 +177,32 @@ fun MainApp() {
 }
 
 @Composable
-fun MainScreen(
+fun EventListContent(
+    viewModel: ReceiptViewModel,
+    onCreateNewBill: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val eventList by viewModel.eventList.collectAsState()
+    
+    EventListScreen(
+        events = eventList,
+        onEventClick = { eventId -> viewModel.navigateToViewEvent(eventId) },
+        onCreateNewBill = onCreateNewBill,
+        onDeleteEvent = { eventId -> viewModel.deleteEvent(eventId) },
+        onEditEventName = { eventId, newName -> viewModel.updateEventName(eventId, newName) },
+        modifier = modifier
+    )
+}
+
+@Composable
+fun CreateNewBillContent(
     viewModel: ReceiptViewModel,
     modifier: Modifier = Modifier
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val receiptUiState by viewModel.receiptUiState.collectAsState()
     
     Box(modifier = modifier.fillMaxSize()) {
-        when (val currentState = uiState) {
+        when (val currentState = receiptUiState) {
             is ReceiptUiState.Initial -> {
                 WelcomeScreen(modifier = Modifier.padding(16.dp))
             }
@@ -221,8 +257,37 @@ fun MainScreen(
                     onExitSplitting = { viewModel.exitSplittingMode() },
                     onDesignatePayer = { payerId -> viewModel.designatePayer(payerId) },
                     onClearPayer = { viewModel.clearPayer() },
+                    onSaveEvent = { eventName -> viewModel.saveCurrentBillAsEvent(eventName) },
                     modifier = Modifier.padding(16.dp)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun ViewEventContent(
+    viewModel: ReceiptViewModel,
+    modifier: Modifier = Modifier
+) {
+    val receiptUiState by viewModel.receiptUiState.collectAsState()
+    
+    Box(modifier = modifier.fillMaxSize()) {
+        when (val currentState = receiptUiState) {
+            is ReceiptUiState.BalanceSummary -> {
+                BalanceSummaryScreen(
+                    receiptWithSplitting = currentState.receiptWithSplitting,
+                    onBackToSplitting = { /* Not applicable for viewing events */ },
+                    onExitSplitting = { viewModel.navigateToEventList() },
+                    onDesignatePayer = { /* Not applicable for viewing events */ },
+                    onClearPayer = { /* Not applicable for viewing events */ },
+                    onSaveEvent = null, // No save for existing events
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+            else -> {
+                // Loading state while event is being loaded
+                LoadingScreen(modifier = Modifier.padding(16.dp))
             }
         }
     }

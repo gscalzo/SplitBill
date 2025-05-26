@@ -1,6 +1,42 @@
 <resources>
     <string name="app_name">SplitBill</string>
     <string name="action_settings">Settings</string>
+
+    <!-- Event Management -->
+    <string name="new_bill">New Bill</string>
+    <string name="event_details">Event Details</string>
+    <string name="create_new_bill">Create New Bill</string>
+    <string name="add_receipt">Add Receipt</string>
+    <string name="take_photo">Take Photo</string>
+    <string name="choose_from_gallery">Choose from Gallery</string>
+    <string name="choose_how_to_add_receipt">Choose how to add a receipt photo</string>
+
+    <!-- Event List -->
+    <string name="total_amount">Total: £%.2f</string>
+    <string name="participant_count">%d participant</string>
+    <string name="participant_count_plural">%d participants</string>
+    <string name="welcome_title">Welcome to Split Bill</string>
+    <string name="welcome_message">Tap the + button to add your first receipt</string>
+
+    <!-- Event Actions -->
+    <string name="edit_event_name">Edit Event Name</string>
+    <string name="edit_event_name_title">Edit Event Name</string>
+    <string name="event_name">Event Name</string>
+    <string name="event_name_label">Event Name</string>
+    <string name="save_event">Save Event</string>
+    <string name="delete_event">Delete Event</string>
+    <string name="delete_event_title">Delete Event</string>
+    <string name="delete_event_confirmation">Are you sure you want to delete \"%s\"? This action cannot be undone.</string>
+    <string name="enter_event_name">Enter event name</string>
+
+    <!-- Common Actions -->
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="done">Done</string>
+    <string name="edit_name">Edit name</string>
+    <string name="delete_event_action">Delete event</string>
+
     <!-- Strings used for fragments for navigation -->
     <string name="first_fragment_label">First Fragment</string>
     <string name="second_fragment_label">Second Fragment</string>

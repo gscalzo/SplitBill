@@ -23,9 +23,11 @@ fun BalanceSummaryScreen(
     onExitSplitting: () -> Unit,
     onDesignatePayer: (String) -> Unit,
     onClearPayer: () -> Unit,
+    onSaveEvent: ((String) -> Unit)? = null, // null for existing events
     modifier: Modifier = Modifier
 ) {
     val summary = receiptWithSplitting.billSplitSummary
+    var showSaveDialog by remember { mutableStateOf(false) }
     
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -47,8 +49,16 @@ fun BalanceSummaryScreen(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
-                Button(onClick = onExitSplitting) {
-                    Text("Done")
+                if (onSaveEvent != null) {
+                    // For new events, show Save button
+                    Button(onClick = { showSaveDialog = true }) {
+                        Text("Save")
+                    }
+                } else {
+                    // For existing events, show Done button
+                    Button(onClick = onExitSplitting) {
+                        Text("Done")
+                    }
                 }
             }
         }
@@ -108,6 +118,17 @@ fun BalanceSummaryScreen(
                 )
             }
         }
+    }
+    
+    // Save Event Dialog
+    if (showSaveDialog && onSaveEvent != null) {
+        SaveEventDialog(
+            onSave = { eventName ->
+                onSaveEvent(eventName)
+                showSaveDialog = false
+            },
+            onDismiss = { showSaveDialog = false }
+        )
     }
 }
 
