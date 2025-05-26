@@ -82,7 +82,7 @@ data class Schema(
 
 data class Property(
     @SerializedName("type")
-    val type: String,
+    val type: Any, // Can be String or List<String> for union types like ["string", "null"]
     @SerializedName("description")
     val description: String? = null,
     @SerializedName("items")

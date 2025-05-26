@@ -53,10 +53,16 @@ class OpenAIService(
             // Create OpenAI request with structured output schema
             val request = createOpenAIRequest(base64Image)
             
-            // Log the request for debugging (only in debug builds)
             if (BuildConfig.DEBUG) {
                 val requestJson = gson.toJson(request)
-                println("OpenAI Request: $requestJson")
+                println("=== FULL OpenAI Request ===")
+                println(requestJson)
+                
+                // Also log just the schema part for easier debugging
+                val schemaJson = gson.toJson(request.responseFormat.jsonSchema.schema)
+                println("=== Schema Only ===")
+                println(schemaJson)
+                println("======================")
             }
             
             // Make API call
@@ -99,15 +105,19 @@ class OpenAIService(
                             text = """
                                 Analyze this image to determine if it's a UK expense receipt. 
                                 
-                                If it is NOT a valid receipt or the image is unclear, return:
-                                {"error": "description of why it's not a valid receipt"}
+                                You must always return a JSON object with ALL four fields: error, items, service, total
                                 
-                                If it IS a valid UK receipt, extract the following information:
-                                - items: array of {name: string, cost: number} for each line item
-                                - service: number (service charge/tip if present, or null)
-                                - total: number (final total amount)
+                                If it is NOT a valid receipt or the image is unclear:
+                                {"error": "description of why it's not a valid receipt", "items": null, "service": null, "total": null}
                                 
-                                Return the data in the specified JSON structure. Use British pound values as numbers (e.g., 12.50 not "£12.50").
+                                If it IS a valid UK receipt:
+                                {"error": null, "items": [{"name": "item name", "cost": 12.50}], "service": 2.41, "total": 26.61}
+                                
+                                Rules:
+                                - Always include all four fields (error, items, service, total)
+                                - Use null for fields that don't apply
+                                - Use British pound values as numbers (e.g., 12.50 not "£12.50")
+                                - If no service charge, set service to null
                             """.trimIndent()
                         ),
                         MessageContent(
@@ -128,11 +138,11 @@ class OpenAIService(
             type = "object",
             properties = mapOf(
                 "error" to Property(
-                    type = "string",
+                    type = listOf("string", "null"), // Union type with null
                     description = "Error message if the image is invalid or not a receipt"
                 ),
                 "items" to Property(
-                    type = "array",
+                    type = listOf("array", "null"), // Union type with null
                     description = "List of items found on the receipt",
                     items = Property(
                         type = "object",
@@ -145,15 +155,15 @@ class OpenAIService(
                     )
                 ),
                 "service" to Property(
-                    type = "number",
+                    type = listOf("number", "null"), // Union type with null
                     description = "Service charge if present"
                 ),
                 "total" to Property(
-                    type = "number",
+                    type = listOf("number", "null"), // Union type with null
                     description = "Total amount on the receipt"
                 )
             ),
-            required = emptyList(),
+            required = listOf("error", "items", "service", "total"), // All fields must be required
             additionalProperties = false
         )
     }
