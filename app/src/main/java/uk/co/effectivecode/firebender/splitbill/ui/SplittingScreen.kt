@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -15,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -208,6 +210,12 @@ fun AddParticipantDialog(
 ) {
     var name by remember { mutableStateOf("") }
     
+    val handleAddParticipant = {
+        if (name.trim().isNotEmpty()) {
+            onAddParticipant(name.trim())
+        }
+    }
+    
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add Participant") },
@@ -217,19 +225,21 @@ fun AddParticipantDialog(
                 onValueChange = { name = it },
                 label = { Text("Name") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { handleAddParticipant() }
+                )
             )
         },
         confirmButton = {
             TextButton(
-                onClick = {
-                    if (name.trim().isNotEmpty()) {
-                        onAddParticipant(name.trim())
-                    }
-                },
+                onClick = handleAddParticipant,
                 enabled = name.trim().isNotEmpty()
             ) {
-                Text("Add")
+                Text("OK")
             }
         },
         dismissButton = {
