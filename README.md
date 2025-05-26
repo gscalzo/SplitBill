@@ -42,7 +42,7 @@ The app uses the actual OpenAI API by default with:
 
 - **gpt-4o-mini model** for cost-effective processing
 - **Structured JSON output** for reliable parsing
-- **Image resizing** to minimize token usage
+- **Full image quality** for better OCR accuracy
 - **Comprehensive error handling** for network issues
 
 ### Testing Mode
@@ -71,6 +71,7 @@ val receiptService: ReceiptParsingService = remember { OpenAIService(useMock = t
 ## Security
 
 - API keys are stored in `.env` files (excluded from git)
-- Images are resized to minimize API token usage
+- Images are compressed (not resized) to balance quality and API token usage
 - All network calls are made asynchronously with proper error handling
 - No sensitive data is logged in production builds
+

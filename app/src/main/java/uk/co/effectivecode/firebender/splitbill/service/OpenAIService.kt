@@ -29,8 +29,8 @@ class OpenAIService(
                     return@withContext Result.failure(Exception("OpenAI API key not configured. Please add OPENAI_API_KEY to your .env file."))
                 }
                 
-                // Resize and encode image
-                val base64Image = ImageUtils.resizeAndEncodeImage(context, imageUri)
+                // Encode image without resizing for better OCR accuracy
+                val base64Image = ImageUtils.encodeImage(context, imageUri, quality = 90)
                     ?: return@withContext Result.failure(Exception("Failed to process image"))
                 
                 if (useMock) {

@@ -10,7 +10,7 @@ import java.io.InputStream
 
 object ImageUtils {
     
-    fun resizeAndEncodeImage(context: Context, uri: Uri, maxWidth: Int = 800, maxHeight: Int = 600): String? {
+    fun encodeImage(context: Context, uri: Uri, quality: Int = 90): String? {
         return try {
             val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
             val originalBitmap = BitmapFactory.decodeStream(inputStream)
@@ -18,11 +18,10 @@ object ImageUtils {
             
             if (originalBitmap == null) return null
             
-            val resizedBitmap = resizeBitmap(originalBitmap, maxWidth, maxHeight)
-            val base64String = bitmapToBase64(resizedBitmap, 85) // 85% quality
+            // Just compress without resizing to maintain quality for OCR
+            val base64String = bitmapToBase64(originalBitmap, quality)
             
             originalBitmap.recycle()
-            resizedBitmap.recycle()
             
             base64String
         } catch (e: Exception) {
@@ -31,18 +30,10 @@ object ImageUtils {
         }
     }
     
-    private fun resizeBitmap(bitmap: Bitmap, maxWidth: Int, maxHeight: Int): Bitmap {
-        val width = bitmap.width
-        val height = bitmap.height
-        
-        val ratio = kotlin.math.min(maxWidth.toFloat() / width, maxHeight.toFloat() / height)
-        
-        if (ratio >= 1) return bitmap
-        
-        val newWidth = (width * ratio).toInt()
-        val newHeight = (height * ratio).toInt()
-        
-        return Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+    // Keep the old method for backward compatibility, but redirect to new method
+    @Deprecated("Use encodeImage instead for better OCR accuracy")
+    fun resizeAndEncodeImage(context: Context, uri: Uri, maxWidth: Int = 800, maxHeight: Int = 600): String? {
+        return encodeImage(context, uri, quality = 85)
     }
     
     private fun bitmapToBase64(bitmap: Bitmap, quality: Int): String {
