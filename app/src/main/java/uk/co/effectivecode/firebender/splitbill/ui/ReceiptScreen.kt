@@ -25,6 +25,7 @@ fun ReceiptScreen(
     onDeleteItem: (Int) -> Unit,
     onUpdateServiceCharge: (Double) -> Unit,
     onUpdateTotal: (Double) -> Unit,
+    onEnterSplittingMode: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -44,6 +45,13 @@ fun ReceiptScreen(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = onEnterSplittingMode,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Split Bill")
+                    }
                 }
             }
         }

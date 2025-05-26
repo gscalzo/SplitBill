@@ -198,3 +198,264 @@ data class EditableReceipt(
         return updateItems(newItems)
     }
 }
+
+// Participant and Bill Splitting Models
+data class Participant(
+    val id: String,
+    val name: String
+) {
+    companion object {
+        fun create(name: String): Participant {
+            return Participant(
+                id = java.util.UUID.randomUUID().toString(),
+                name = name.trim()
+            )
+        }
+    }
+}
+
+sealed class ItemAssignment {
+    data class EqualSplit(val participantIds: List<String>) : ItemAssignment()
+    data class IndividualAssignment(val participantId: String) : ItemAssignment()
+    object Unassigned : ItemAssignment()
+}
+
+data class AssignedReceiptItem(
+    val receiptItem: ReceiptItem,
+    val assignment: ItemAssignment
+) {
+    val isAssigned: Boolean
+        get() = assignment !is ItemAssignment.Unassigned
+}
+
+data class ParticipantBalance(
+    val participant: Participant,
+    val itemsOwed: List<ReceiptItem>,
+    val subtotal: Double,
+    val serviceCharge: Double,
+    val total: Double
+)
+
+data class BillSplitSummary(
+    val participants: List<Participant>,
+    val assignedItems: List<AssignedReceiptItem>,
+    val balances: List<ParticipantBalance>,
+    val totalAssigned: Double,
+    val totalUnassigned: Double,
+    val isFullyAssigned: Boolean
+) {
+    companion object {
+        fun calculate(
+            participants: List<Participant>,
+            assignedItems: List<AssignedReceiptItem>,
+            serviceCharge: Double
+        ): BillSplitSummary {
+            val balances = participants.map { participant ->
+                calculateParticipantBalance(participant, assignedItems, serviceCharge, participants.size)
+            }
+            
+            val totalAssigned = assignedItems.filter { it.isAssigned }.sumOf { it.receiptItem.cost }
+            val totalUnassigned = assignedItems.filter { !it.isAssigned }.sumOf { it.receiptItem.cost }
+            val isFullyAssigned = totalUnassigned == 0.0
+            
+            return BillSplitSummary(
+                participants = participants,
+                assignedItems = assignedItems,
+                balances = balances,
+                totalAssigned = totalAssigned,
+                totalUnassigned = totalUnassigned,
+                isFullyAssigned = isFullyAssigned
+            )
+        }
+        
+        private fun calculateParticipantBalance(
+            participant: Participant,
+            assignedItems: List<AssignedReceiptItem>,
+            serviceCharge: Double,
+            totalParticipants: Int
+        ): ParticipantBalance {
+            val itemsOwed = mutableListOf<ReceiptItem>()
+            var subtotal = 0.0
+            
+            assignedItems.forEach { assignedItem ->
+                when (val assignment = assignedItem.assignment) {
+                    is ItemAssignment.IndividualAssignment -> {
+                        if (assignment.participantId == participant.id) {
+                            itemsOwed.add(assignedItem.receiptItem)
+                            subtotal += assignedItem.receiptItem.cost
+                        }
+                    }
+                    is ItemAssignment.EqualSplit -> {
+                        if (assignment.participantIds.contains(participant.id)) {
+                            val splitCost = assignedItem.receiptItem.cost / assignment.participantIds.size
+                            val splitItem = assignedItem.receiptItem.copy(
+                                name = "${assignedItem.receiptItem.name} (split ${assignment.participantIds.size} ways)",
+                                cost = splitCost
+                            )
+                            itemsOwed.add(splitItem)
+                            subtotal += splitCost
+                        }
+                    }
+                    ItemAssignment.Unassigned -> {
+                        // Unassigned items don't contribute to individual balances
+                    }
+                }
+            }
+            
+            // Service charge is split equally among all participants
+            val participantServiceCharge = if (totalParticipants > 0) serviceCharge / totalParticipants else 0.0
+            val total = subtotal + participantServiceCharge
+            
+            return ParticipantBalance(
+                participant = participant,
+                itemsOwed = itemsOwed,
+                subtotal = subtotal,
+                serviceCharge = participantServiceCharge,
+                total = total
+            )
+        }
+    }
+}
+
+data class EditableReceiptWithSplitting(
+    val editableReceipt: EditableReceipt,
+    val participants: List<Participant>,
+    val assignedItems: List<AssignedReceiptItem>,
+    val billSplitSummary: BillSplitSummary
+) {
+    companion object {
+        fun fromEditableReceipt(editableReceipt: EditableReceipt): EditableReceiptWithSplitting {
+            val assignedItems = editableReceipt.items.map { item ->
+                AssignedReceiptItem(item, ItemAssignment.Unassigned)
+            }
+            val participants = emptyList<Participant>()
+            val billSplitSummary = BillSplitSummary.calculate(participants, assignedItems, editableReceipt.serviceCharge)
+            
+            return EditableReceiptWithSplitting(
+                editableReceipt = editableReceipt,
+                participants = participants,
+                assignedItems = assignedItems,
+                billSplitSummary = billSplitSummary
+            )
+        }
+    }
+    
+    fun addParticipant(name: String): EditableReceiptWithSplitting {
+        val newParticipant = Participant.create(name)
+        val updatedParticipants = participants + newParticipant
+        val updatedSummary = BillSplitSummary.calculate(updatedParticipants, assignedItems, editableReceipt.serviceCharge)
+        
+        return copy(
+            participants = updatedParticipants,
+            billSplitSummary = updatedSummary
+        )
+    }
+    
+    fun removeParticipant(participantId: String): EditableReceiptWithSplitting {
+        val updatedParticipants = participants.filter { it.id != participantId }
+        // Remove participant from any assignments
+        val updatedAssignedItems = assignedItems.map { assignedItem ->
+            when (val assignment = assignedItem.assignment) {
+                is ItemAssignment.IndividualAssignment -> {
+                    if (assignment.participantId == participantId) {
+                        assignedItem.copy(assignment = ItemAssignment.Unassigned)
+                    } else {
+                        assignedItem
+                    }
+                }
+                is ItemAssignment.EqualSplit -> {
+                    val updatedParticipantIds = assignment.participantIds.filter { it != participantId }
+                    if (updatedParticipantIds.isEmpty()) {
+                        assignedItem.copy(assignment = ItemAssignment.Unassigned)
+                    } else {
+                        assignedItem.copy(assignment = ItemAssignment.EqualSplit(updatedParticipantIds))
+                    }
+                }
+                ItemAssignment.Unassigned -> assignedItem
+            }
+        }
+        val updatedSummary = BillSplitSummary.calculate(updatedParticipants, updatedAssignedItems, editableReceipt.serviceCharge)
+        
+        return copy(
+            participants = updatedParticipants,
+            assignedItems = updatedAssignedItems,
+            billSplitSummary = updatedSummary
+        )
+    }
+    
+    fun assignItemToParticipant(itemIndex: Int, participantId: String): EditableReceiptWithSplitting {
+        if (itemIndex < 0 || itemIndex >= assignedItems.size) return this
+        
+        val updatedAssignedItems = assignedItems.toMutableList()
+        updatedAssignedItems[itemIndex] = updatedAssignedItems[itemIndex].copy(
+            assignment = ItemAssignment.IndividualAssignment(participantId)
+        )
+        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, editableReceipt.serviceCharge)
+        
+        return copy(
+            assignedItems = updatedAssignedItems,
+            billSplitSummary = updatedSummary
+        )
+    }
+    
+    fun assignItemToEqualSplit(itemIndex: Int, participantIds: List<String>): EditableReceiptWithSplitting {
+        if (itemIndex < 0 || itemIndex >= assignedItems.size) return this
+        
+        val updatedAssignedItems = assignedItems.toMutableList()
+        updatedAssignedItems[itemIndex] = updatedAssignedItems[itemIndex].copy(
+            assignment = if (participantIds.isEmpty()) {
+                ItemAssignment.Unassigned
+            } else {
+                ItemAssignment.EqualSplit(participantIds)
+            }
+        )
+        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, editableReceipt.serviceCharge)
+        
+        return copy(
+            assignedItems = updatedAssignedItems,
+            billSplitSummary = updatedSummary
+        )
+    }
+    
+    fun updateReceiptItem(itemIndex: Int, newItem: ReceiptItem): EditableReceiptWithSplitting {
+        val updatedEditableReceipt = editableReceipt.updateItem(itemIndex, newItem)
+        val updatedAssignedItems = assignedItems.toMutableList()
+        if (itemIndex >= 0 && itemIndex < updatedAssignedItems.size) {
+            updatedAssignedItems[itemIndex] = updatedAssignedItems[itemIndex].copy(receiptItem = newItem)
+        }
+        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, updatedEditableReceipt.serviceCharge)
+        
+        return copy(
+            editableReceipt = updatedEditableReceipt,
+            assignedItems = updatedAssignedItems,
+            billSplitSummary = updatedSummary
+        )
+    }
+    
+    fun addReceiptItem(item: ReceiptItem): EditableReceiptWithSplitting {
+        val updatedEditableReceipt = editableReceipt.addItem(item)
+        val updatedAssignedItems = assignedItems + AssignedReceiptItem(item, ItemAssignment.Unassigned)
+        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, updatedEditableReceipt.serviceCharge)
+        
+        return copy(
+            editableReceipt = updatedEditableReceipt,
+            assignedItems = updatedAssignedItems,
+            billSplitSummary = updatedSummary
+        )
+    }
+    
+    fun deleteReceiptItem(itemIndex: Int): EditableReceiptWithSplitting {
+        val updatedEditableReceipt = editableReceipt.deleteItem(itemIndex)
+        val updatedAssignedItems = assignedItems.toMutableList()
+        if (itemIndex >= 0 && itemIndex < updatedAssignedItems.size) {
+            updatedAssignedItems.removeAt(itemIndex)
+        }
+        val updatedSummary = BillSplitSummary.calculate(participants, updatedAssignedItems, updatedEditableReceipt.serviceCharge)
+        
+        return copy(
+            editableReceipt = updatedEditableReceipt,
+            assignedItems = updatedAssignedItems,
+            billSplitSummary = updatedSummary
+        )
+    }
+}

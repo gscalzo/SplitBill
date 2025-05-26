@@ -191,7 +191,34 @@ fun MainScreen(
                     onDeleteItem = { index -> viewModel.deleteItem(index) },
                     onUpdateServiceCharge = { serviceCharge -> viewModel.updateServiceCharge(serviceCharge) },
                     onUpdateTotal = { total -> viewModel.updateTotal(total) },
+                    onEnterSplittingMode = { viewModel.enterSplittingMode() },
                     modifier = Modifier.padding(16.dp)
+                )
+            }
+            
+            is ReceiptUiState.SplittingMode -> {
+                SplittingScreen(
+                    receiptWithSplitting = currentState.receiptWithSplitting,
+                    onAddParticipant = { name -> viewModel.addParticipant(name) },
+                    onRemoveParticipant = { participantId -> viewModel.removeParticipant(participantId) },
+                    onAssignItemToParticipant = { itemIndex, participantId -> 
+                        viewModel.assignItemToParticipant(itemIndex, participantId) 
+                    },
+                    onAssignItemToEqualSplit = { itemIndex, participantIds -> 
+                        viewModel.assignItemToEqualSplit(itemIndex, participantIds) 
+                    },
+                    onUpdateItem = { index, item -> viewModel.updateItem(index, item) },
+                    onDeleteItem = { index -> viewModel.deleteItem(index) },
+                    onShowBalanceSummary = { viewModel.showBalanceSummary() },
+                    onExitSplitting = { viewModel.exitSplittingMode() }
+                )
+            }
+            
+            is ReceiptUiState.BalanceSummary -> {
+                BalanceSummaryScreen(
+                    receiptWithSplitting = currentState.receiptWithSplitting,
+                    onBackToSplitting = { viewModel.backToSplitting() },
+                    onExitSplitting = { viewModel.exitSplittingMode() }
                 )
             }
         }
