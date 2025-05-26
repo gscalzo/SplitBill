@@ -283,9 +283,24 @@ fun ReceiptDisplay(
     result: ReceiptParseResult,
     onItemUpdated: (Int, ReceiptItem) -> Unit
 ) {
+    var editableResult by remember { mutableStateOf(result) }
+    
+    // Update editable result when result changes
+    LaunchedEffect(result) {
+        editableResult = result
+    }
+    
+    // Calculate partial total from items
+    val partialTotal = editableResult.items?.sumOf { it.cost } ?: 0.0
+    val serviceCharge = editableResult.service ?: 0.0
+    val expectedTotal = partialTotal + serviceCharge
+    val actualTotal = editableResult.total ?: 0.0
+    val hasDiscrepancy = kotlin.math.abs(expectedTotal - actualTotal) > 0.01
+    
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(bottom = 80.dp) // Add padding to prevent FAB from obscuring content
     ) {
         item {
             Card(
@@ -303,7 +318,7 @@ fun ReceiptDisplay(
             }
         }
         
-        if (result.error != null) {
+        if (editableResult.error != null) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -321,7 +336,7 @@ fun ReceiptDisplay(
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
                         Text(
-                            text = result.error,
+                            text = editableResult.error ?: "Unknown error",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
@@ -330,20 +345,32 @@ fun ReceiptDisplay(
             }
         }
         
-        result.items?.let { items ->
+        editableResult.items?.let { items ->
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "Items",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(
+                            onClick = {
+                                val newItem = ReceiptItem("New Item", 1, 0.0)
+                                val updatedItems = items.toMutableList().apply { add(newItem) }
+                                editableResult = editableResult.copy(items = updatedItems)
+                            }
+                        ) {
+                            Text("Add Item")
+                        }
                     }
                 }
             }
@@ -351,12 +378,21 @@ fun ReceiptDisplay(
             itemsIndexed(items) { index, item ->
                 EditableReceiptItem(
                     item = item,
-                    onItemUpdated = { updatedItem -> onItemUpdated(index, updatedItem) }
+                    onItemUpdated = { updatedItem -> 
+                        val updatedItems = items.toMutableList()
+                        updatedItems[index] = updatedItem
+                        editableResult = editableResult.copy(items = updatedItems)
+                        onItemUpdated(index, updatedItem)
+                    },
+                    onItemDeleted = {
+                        val updatedItems = items.toMutableList()
+                        updatedItems.removeAt(index)
+                        editableResult = editableResult.copy(items = updatedItems)
+                    }
                 )
             }
-        }
-        
-        result.service?.let { service ->
+            
+            // Partial Total Display
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth()
@@ -368,12 +404,12 @@ fun ReceiptDisplay(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Service Charge",
+                            text = "Subtotal (Items)",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = "£%.2f".format(service),
+                            text = "£%.2f".format(partialTotal),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
                         )
@@ -382,31 +418,246 @@ fun ReceiptDisplay(
             }
         }
         
-        result.total?.let { total ->
+        // Editable Service Charge
+        item {
+            EditableServiceCharge(
+                service = editableResult.service ?: 0.0,
+                onServiceUpdated = { newService ->
+                    editableResult = editableResult.copy(service = newService)
+                }
+            )
+        }
+        
+        // Editable Total
+        item {
+            EditableTotal(
+                total = editableResult.total ?: 0.0,
+                expectedTotal = expectedTotal,
+                hasDiscrepancy = hasDiscrepancy,
+                onTotalUpdated = { newTotal ->
+                    editableResult = editableResult.copy(total = newTotal)
+                }
+            )
+        }
+        
+        // Discrepancy Warning
+        if (hasDiscrepancy) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                        containerColor = MaterialTheme.colorScheme.errorContainer
                     )
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Column(
+                        modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "Total",
-                            style = MaterialTheme.typography.titleMedium,
+                            text = "⚠️ Total Discrepancy Detected",
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = MaterialTheme.colorScheme.onErrorContainer
                         )
                         Text(
-                            text = "£%.2f".format(total),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            text = "Expected: £%.2f, Actual: £%.2f (Difference: £%.2f)".format(
+                                expectedTotal, actualTotal, kotlin.math.abs(expectedTotal - actualTotal)
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditableServiceCharge(
+    service: Double,
+    onServiceUpdated: (Double) -> Unit
+) {
+    var isEditing by remember { mutableStateOf(false) }
+    var editedService by remember { mutableStateOf("%.2f".format(service)) }
+    
+    LaunchedEffect(service) {
+        editedService = "%.2f".format(service)
+    }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (isEditing) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                TextField(
+                    value = editedService,
+                    onValueChange = { editedService = it },
+                    label = { Text("Service Charge") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = {
+                            isEditing = false
+                            editedService = "%.2f".format(service)
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                    TextButton(
+                        onClick = {
+                            val newService = editedService.toDoubleOrNull() ?: service
+                            onServiceUpdated(newService)
+                            isEditing = false
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Service Charge",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "£%.2f".format(service),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    IconButton(
+                        onClick = { isEditing = true }
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit Service Charge"
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditableTotal(
+    total: Double,
+    expectedTotal: Double,
+    hasDiscrepancy: Boolean,
+    onTotalUpdated: (Double) -> Unit
+) {
+    var isEditing by remember { mutableStateOf(false) }
+    var editedTotal by remember { mutableStateOf("%.2f".format(total)) }
+    
+    LaunchedEffect(total) {
+        editedTotal = "%.2f".format(total)
+    }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (hasDiscrepancy) 
+                MaterialTheme.colorScheme.errorContainer 
+            else 
+                MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        if (isEditing) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                TextField(
+                    value = editedTotal,
+                    onValueChange = { editedTotal = it },
+                    label = { Text("Total") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = {
+                            isEditing = false
+                            editedTotal = "%.2f".format(total)
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                    TextButton(
+                        onClick = {
+                            val newTotal = editedTotal.toDoubleOrNull() ?: total
+                            onTotalUpdated(newTotal)
+                            isEditing = false
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Total",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (hasDiscrepancy) 
+                        MaterialTheme.colorScheme.onErrorContainer 
+                    else 
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "£%.2f".format(total),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (hasDiscrepancy) 
+                            MaterialTheme.colorScheme.onErrorContainer 
+                        else 
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    IconButton(
+                        onClick = { isEditing = true }
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit Total",
+                            tint = if (hasDiscrepancy) 
+                                MaterialTheme.colorScheme.onErrorContainer 
+                            else 
+                                MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 }
@@ -418,7 +669,8 @@ fun ReceiptDisplay(
 @Composable
 fun EditableReceiptItem(
     item: ReceiptItem,
-    onItemUpdated: (ReceiptItem) -> Unit
+    onItemUpdated: (ReceiptItem) -> Unit,
+    onItemDeleted: () -> Unit
 ) {
     var isEditing by remember { mutableStateOf(false) }
     var editedName by remember { mutableStateOf(item.name) }
@@ -470,32 +722,42 @@ fun EditableReceiptItem(
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     TextButton(
-                        onClick = {
-                            isEditing = false
-                            editedName = item.name
-                            editedQuantity = item.quantity.toString()
-                            editedCost = "%.2f".format(item.cost)
-                        }
+                        onClick = onItemDeleted,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
                     ) {
-                        Text("Cancel")
+                        Text("Delete")
                     }
-                    TextButton(
-                        onClick = {
-                            val quantity = editedQuantity.toIntOrNull() ?: item.quantity
-                            val cost = editedCost.toDoubleOrNull() ?: item.cost
-                            val updatedItem = item.copy(
-                                name = editedName.trim(),
-                                quantity = quantity,
-                                cost = cost
-                            )
-                            onItemUpdated(updatedItem)
-                            isEditing = false
+                    Row {
+                        TextButton(
+                            onClick = {
+                                isEditing = false
+                                editedName = item.name
+                                editedQuantity = item.quantity.toString()
+                                editedCost = "%.2f".format(item.cost)
+                            }
+                        ) {
+                            Text("Cancel")
                         }
-                    ) {
-                        Text("Save")
+                        TextButton(
+                            onClick = {
+                                val quantity = editedQuantity.toIntOrNull() ?: item.quantity
+                                val cost = editedCost.toDoubleOrNull() ?: item.cost
+                                val updatedItem = item.copy(
+                                    name = editedName.trim(),
+                                    quantity = quantity,
+                                    cost = cost
+                                )
+                                onItemUpdated(updatedItem)
+                                isEditing = false
+                            }
+                        ) {
+                            Text("Save")
+                        }
                     }
                 }
             }
