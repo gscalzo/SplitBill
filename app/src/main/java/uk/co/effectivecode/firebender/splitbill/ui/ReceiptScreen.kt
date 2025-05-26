@@ -45,12 +45,24 @@ fun ReceiptScreen(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = onEnterSplittingMode,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Split Bill")
+                    
+                    // Only show Split Bill button when there are no discrepancies
+                    if (!editableReceipt.calculation.hasDiscrepancy) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = onEnterSplittingMode,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Split Bill")
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "⚠️ Please resolve discrepancies before splitting the bill",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }

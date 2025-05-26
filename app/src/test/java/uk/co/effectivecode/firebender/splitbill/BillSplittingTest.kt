@@ -312,4 +312,66 @@ class BillSplittingTest {
             assertEquals(1.23, balance.serviceCharge, 0.01) // 3.70 / 3
         }
     }
+
+    @Test
+    fun `receipt with discrepancy should not allow bill splitting`() {
+        // Given - Create a receipt with intentional discrepancy
+        val parseResult = ReceiptParseResult(
+            items = listOf(
+                ReceiptItem("Pizza", 1, 15.00),
+                ReceiptItem("Drink", 1, 5.00)
+            ),
+            service = 2.00,
+            total = 25.00 // Expected: 22.00 (15 + 5 + 2), Actual: 25.00 - creates discrepancy
+        )
+        val editableReceipt = EditableReceipt.fromParseResult(parseResult)
+        
+        // When & Then
+        assertTrue("Receipt should have discrepancy", editableReceipt.calculation.hasDiscrepancy)
+        assertEquals(20.00, editableReceipt.calculation.subtotal, 0.01)
+        assertEquals(22.00, editableReceipt.calculation.expectedTotal, 0.01)
+        assertEquals(25.00, editableReceipt.calculation.actualTotal, 0.01)
+        assertEquals(3.00, editableReceipt.calculation.discrepancyAmount, 0.01)
+    }
+
+    @Test
+    fun `receipt without discrepancy should allow bill splitting`() {
+        // Given - Create a receipt without discrepancy
+        val parseResult = ReceiptParseResult(
+            items = listOf(
+                ReceiptItem("Pizza", 1, 15.00),
+                ReceiptItem("Drink", 1, 5.00)
+            ),
+            service = 2.00,
+            total = 22.00 // Expected: 22.00 (15 + 5 + 2), Actual: 22.00 - no discrepancy
+        )
+        val editableReceipt = EditableReceipt.fromParseResult(parseResult)
+        
+        // When & Then
+        assertFalse("Receipt should not have discrepancy", editableReceipt.calculation.hasDiscrepancy)
+        assertEquals(20.00, editableReceipt.calculation.subtotal, 0.01)
+        assertEquals(22.00, editableReceipt.calculation.expectedTotal, 0.01)
+        assertEquals(22.00, editableReceipt.calculation.actualTotal, 0.01)
+        assertEquals(0.00, editableReceipt.calculation.discrepancyAmount, 0.01)
+    }
+
+    @Test
+    fun `fixing discrepancy should enable bill splitting`() {
+        // Given - Start with receipt that has discrepancy
+        val parseResult = ReceiptParseResult(
+            items = listOf(ReceiptItem("Pizza", 1, 15.00)),
+            service = 1.50,
+            total = 20.00 // Expected: 16.50, creates discrepancy
+        )
+        val editableReceipt = EditableReceipt.fromParseResult(parseResult)
+        
+        // When - Fix the total to match expected
+        val fixedReceipt = editableReceipt.updateTotal(16.50)
+        
+        // Then
+        assertTrue("Original receipt should have discrepancy", editableReceipt.calculation.hasDiscrepancy)
+        assertFalse("Fixed receipt should not have discrepancy", fixedReceipt.calculation.hasDiscrepancy)
+        assertEquals(16.50, fixedReceipt.calculation.expectedTotal, 0.01)
+        assertEquals(16.50, fixedReceipt.calculation.actualTotal, 0.01)
+    }
 }
