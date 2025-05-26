@@ -1,0 +1,15 @@
+{
+  "rules": [
+    "Project is a Split-Bill Android app",
+    "Adopt a simple Clean-MVVM architecture: UI (Jetpack Compose) → ViewModel → Use-cases → Repositories → Data sources",
+    "Use Kotlin coroutines and Flow for all asynchronous work; never call runBlocking in production code",
+    "Persist data locally with Room or DataStore; expose it via repository interfaces",
+    "Call AI Service for receipt parsing in a separate data source layer (never from UI/ViewModel)",
+    "Follow Material Design 3 components and typography; build UI with Jetpack Compose",
+    "Avoid hard-coded dp, strings, or colours; use dimension, string, and theme resources",
+    "Annotate Retrofit/serialization models with @SerializedName because code is obfuscated",
+    "Consider the task complete when the tests run correctly. Before proceeding to the next task, please verify that the tests have run successfully.",
+    "Write unit tests for receipt parsing, split calculations, and payment tracking; write UI tests for the main bill-creation flow",
+    "Keep code clean: small, single-purpose functions, descriptive names, no magic numbers"
+  ]
+}
