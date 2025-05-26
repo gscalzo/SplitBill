@@ -61,4 +61,51 @@ class FileEventRepositoryTest {
         assertEquals(2.00, event.receiptWithSplitting.editableReceipt.serviceCharge, 0.01)
         assertEquals(20.99, event.receiptWithSplitting.editableReceipt.total, 0.01)
     }
+
+    @Test
+    fun `test event id generation is unique`() {
+        val event1 = BillEvent(
+            name = "Event 1",
+            receiptWithSplitting = EditableReceiptWithSplitting.fromEditableReceipt(
+                EditableReceipt.fromParseResult(ReceiptParseResult(null, emptyList(), 0.0, 0.0))
+            )
+        )
+        
+        val event2 = BillEvent(
+            name = "Event 2", 
+            receiptWithSplitting = EditableReceiptWithSplitting.fromEditableReceipt(
+                EditableReceipt.fromParseResult(ReceiptParseResult(null, emptyList(), 0.0, 0.0))
+            )
+        )
+        
+        assertNotEquals("Event IDs should be unique", event1.id, event2.id)
+        assertTrue("Event 1 ID should not be empty", event1.id.isNotEmpty())
+        assertTrue("Event 2 ID should not be empty", event2.id.isNotEmpty())
+    }
+
+    @Test
+    fun `test event name can be modified`() {
+        val event = createSampleEvent()
+        val originalName = event.name
+        
+        // Test that name can be changed (since it's var)
+        event.name = "Updated Event Name"
+        assertEquals("Updated Event Name", event.name)
+        assertNotEquals("Name should be changed", originalName, event.name)
+    }
+
+    @Test
+    fun `test event timestamp is reasonable`() {
+        val event = BillEvent(
+            name = "New Event",
+            receiptWithSplitting = EditableReceiptWithSplitting.fromEditableReceipt(
+                EditableReceipt.fromParseResult(ReceiptParseResult(null, emptyList(), 0.0, 0.0))
+            )
+        )
+        
+        val currentTime = System.currentTimeMillis()
+        // Event timestamp should be recent (within last 10 seconds)
+        assertTrue("Event timestamp should be recent", 
+            Math.abs(currentTime - event.timestamp) < 10000)
+    }
 }

@@ -50,8 +50,12 @@ class ReceiptViewModel(
     private fun loadEvents() {
         viewModelScope.launch {
             eventRepository.getAllEvents()
-                .onSuccess { _eventList.value = it }
-                .onFailure { /* Handle error */ }
+                .onSuccess { events ->
+                    _eventList.value = events
+                }
+                .onFailure { exception ->
+                    /* Handle error */
+                }
         }
     }
     
@@ -61,6 +65,7 @@ class ReceiptViewModel(
     }
     
     fun navigateToEventList() {
+        _receiptUiState.value = ReceiptUiState.Initial // Reset receipt state when going back to list
         _mainScreenState.value = MainScreenState.EventList
         loadEvents() // Refresh list
     }
@@ -264,7 +269,9 @@ class ReceiptViewModel(
                     .onSuccess {
                         navigateToEventList()
                     }
-                    .onFailure { /* Handle error */ }
+                    .onFailure { exception ->
+                        /* Handle error */
+                    }
             }
         }
     }

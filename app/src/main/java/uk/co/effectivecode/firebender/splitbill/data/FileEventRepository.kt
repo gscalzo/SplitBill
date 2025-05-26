@@ -24,8 +24,9 @@ class FileEventRepository(private val context: Context) : EventRepository {
     override suspend fun saveEvent(event: BillEvent): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val file = File(eventsDir, "${event.id}.json")
-            FileWriter(file).use {
-                gson.toJson(event, it)
+            FileWriter(file).use { writer ->
+                gson.toJson(event, writer)
+                writer.flush() // Ensure data is written to disk
             }
             Result.success(Unit)
         } catch (e: Exception) {
@@ -75,8 +76,9 @@ class FileEventRepository(private val context: Context) : EventRepository {
                     gson.fromJson(it, BillEvent::class.java)
                 }
                 event.name = newName // Assuming BillEvent.name is var
-                FileWriter(file).use {
-                    gson.toJson(event, it)
+                FileWriter(file).use { writer ->
+                    gson.toJson(event, writer)
+                    writer.flush() // Ensure data is written to disk
                 }
                 Result.success(Unit)
             } else {
