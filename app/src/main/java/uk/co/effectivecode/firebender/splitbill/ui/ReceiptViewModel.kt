@@ -2,6 +2,7 @@ package uk.co.effectivecode.firebender.splitbill.ui
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,43 +45,57 @@ class ReceiptViewModel(
     val currentEvent: StateFlow<BillEvent?> = _currentEvent.asStateFlow()
     
     init {
+        Log.d(TAG, "ReceiptViewModel initialized, loading events")
         loadEvents()
     }
     
     private fun loadEvents() {
+        Log.d(TAG, "Loading events from repository")
         viewModelScope.launch {
             eventRepository.getAllEvents()
                 .onSuccess { events ->
+                    Log.d(TAG, "Successfully loaded ${events.size} events from repository")
                     _eventList.value = events
+                    events.forEach { event ->
+                        Log.d(TAG, "Event in list: ${event.id}, name: ${event.name}")
+                    }
                 }
                 .onFailure { exception ->
-                    /* Handle error */
+                    Log.e(TAG, "Failed to load events", exception)
                 }
         }
     }
     
     fun navigateToCreateNewBill() {
+        Log.d(TAG, "Navigating to create new bill")
         _receiptUiState.value = ReceiptUiState.Initial // Reset receipt state
         _mainScreenState.value = MainScreenState.CreateNewBill
     }
     
     fun navigateToEventList() {
+        Log.d(TAG, "Navigating to event list")
         _receiptUiState.value = ReceiptUiState.Initial // Reset receipt state when going back to list
         _mainScreenState.value = MainScreenState.EventList
         loadEvents() // Refresh list
     }
     
     fun navigateToViewEvent(eventId: String) {
+        Log.d(TAG, "Navigating to view event: $eventId")
         viewModelScope.launch {
             eventRepository.getEventById(eventId)
                 .onSuccess { event ->
                     event?.let {
+                        Log.d(TAG, "Successfully loaded event for viewing: ${it.id}, name: ${it.name}")
                         _currentEvent.value = it
                         _receiptUiState.value = ReceiptUiState.BalanceSummary(it.receiptWithSplitting)
                         _mainScreenState.value = MainScreenState.ViewEvent(eventId)
+                    } ?: run {
+                        Log.w(TAG, "Event not found for ID: $eventId")
                     }
                 }
-                .onFailure { /* Handle error */ }
+                .onFailure { exception ->
+                    Log.e(TAG, "Failed to load event for viewing: $eventId", exception)
+                }
         }
     }
     
@@ -259,27 +274,36 @@ class ReceiptViewModel(
     
     fun saveCurrentBillAsEvent(eventName: String) {
         val currentState = _receiptUiState.value
+        Log.d(TAG, "Attempting to save current bill as event: $eventName, current state: ${currentState::class.simpleName}")
+        
         if (currentState is ReceiptUiState.BalanceSummary) {
             viewModelScope.launch {
                 val event = BillEvent(
                     name = eventName,
                     receiptWithSplitting = currentState.receiptWithSplitting
                 )
+                Log.d(TAG, "Created event object: ${event.id}, name: ${event.name}, participants: ${event.receiptWithSplitting.participants.size}")
+                
                 eventRepository.saveEvent(event)
                     .onSuccess {
+                        Log.d(TAG, "Event saved successfully, navigating to event list")
                         navigateToEventList()
                     }
                     .onFailure { exception ->
-                        /* Handle error */
+                        Log.e(TAG, "Failed to save event: $eventName", exception)
                     }
             }
+        } else {
+            Log.w(TAG, "Cannot save event - not in BalanceSummary state. Current state: ${currentState::class.simpleName}")
         }
     }
     
     fun updateEventName(eventId: String, newEventName: String) {
+        Log.d(TAG, "Updating event name: $eventId to $newEventName")
         viewModelScope.launch {
             eventRepository.updateEventName(eventId, newEventName)
                 .onSuccess {
+                    Log.d(TAG, "Event name updated successfully")
                     // If it's the current event being viewed, refresh it
                     if (_currentEvent.value?.id == eventId) {
                         navigateToViewEvent(eventId)
@@ -287,31 +311,42 @@ class ReceiptViewModel(
                     // Always refresh the event list
                     loadEvents()
                 }
-                .onFailure { /* Handle error */ }
+                .onFailure { exception ->
+                    Log.e(TAG, "Failed to update event name", exception)
+                }
         }
     }
     
     fun updateCurrentEventName(newEventName: String) {
         val event = _currentEvent.value
         val mainState = _mainScreenState.value
+        Log.d(TAG, "Updating current event name to: $newEventName")
+        
         if (event != null && mainState is MainScreenState.ViewEvent) {
             viewModelScope.launch {
                 eventRepository.updateEventName(event.id, newEventName)
                     .onSuccess {
+                        Log.d(TAG, "Current event name updated successfully")
                         // Refresh the current event details
                         navigateToViewEvent(event.id)
                         // Also refresh the list in case it's visible
                         loadEvents()
                     }
-                    .onFailure { /* Handle error */ }
+                    .onFailure { exception ->
+                        Log.e(TAG, "Failed to update current event name", exception)
+                    }
             }
+        } else {
+            Log.w(TAG, "Cannot update current event name - no current event or not in ViewEvent state")
         }
     }
     
     fun deleteEvent(eventId: String) {
+        Log.d(TAG, "Deleting event: $eventId")
         viewModelScope.launch {
             eventRepository.deleteEvent(eventId)
                 .onSuccess {
+                    Log.d(TAG, "Event deleted successfully")
                     // If current event was deleted, go back to list
                     if (_currentEvent.value?.id == eventId) {
                         navigateToEventList()
@@ -319,11 +354,18 @@ class ReceiptViewModel(
                         loadEvents() // Just refresh list
                     }
                 }
-                .onFailure { /* Handle error */ }
+                .onFailure { exception ->
+                    Log.e(TAG, "Failed to delete event", exception)
+                }
         }
     }
     
     fun retry() {
+        Log.d(TAG, "UI retry requested")
         _receiptUiState.value = ReceiptUiState.Initial
+    }
+    
+    companion object {
+        private const val TAG = "ReceiptViewModel"
     }
 }

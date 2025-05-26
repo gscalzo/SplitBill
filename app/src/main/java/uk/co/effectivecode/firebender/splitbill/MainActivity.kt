@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -40,17 +41,23 @@ import uk.co.effectivecode.firebender.splitbill.ui.*
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "MainActivity onCreate")
         setContent {
             SplitBillTheme {
                 MainApp()
             }
         }
     }
+    
+    companion object {
+        private const val TAG = "MainActivity"
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainApp() {
+    Log.d(TAG, "MainApp composing")
     var showImageSourceDialog by remember { mutableStateOf(false) }
     
     val context = LocalContext.current
@@ -99,25 +106,37 @@ fun MainApp() {
     }
     
     val mainScreenState by viewModel.mainScreenState.collectAsState()
+    Log.d(TAG, "MainApp current screen state: ${mainScreenState::class.simpleName}")
     
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(text = when (mainScreenState) {
-                        is MainScreenState.EventList -> stringResource(id = R.string.app_name)
-                        is MainScreenState.CreateNewBill -> stringResource(id = R.string.new_bill)
-                        is MainScreenState.ViewEvent -> stringResource(id = R.string.event_details)
+                    Text(text = when (val currentState = mainScreenState) {
+                        is MainScreenState.EventList -> {
+                            Log.d(TAG, "Displaying EventList top bar")
+                            stringResource(id = R.string.app_name)
+                        }
+                        is MainScreenState.CreateNewBill -> {
+                            Log.d(TAG, "Displaying CreateNewBill top bar")
+                            stringResource(id = R.string.new_bill)
+                        }
+                        is MainScreenState.ViewEvent -> {
+                            Log.d(TAG, "Displaying ViewEvent top bar for event: ${currentState.eventId}")
+                            stringResource(id = R.string.event_details)
+                        }
                     })
                 }
             )
         }
     ) { innerPadding ->
-        when (mainScreenState) {
+        when (val currentState = mainScreenState) {
             is MainScreenState.EventList -> {
+                Log.d(TAG, "Rendering EventList screen")
                 EventListContent(
                     viewModel = viewModel,
                     onCreateNewBill = {
+                        Log.d(TAG, "Create new bill clicked")
                         viewModel.navigateToCreateNewBill()
                         showImageSourceDialog = true
                     },
@@ -125,12 +144,14 @@ fun MainApp() {
                 )
             }
             is MainScreenState.CreateNewBill -> {
+                Log.d(TAG, "Rendering CreateNewBill screen")
                 CreateNewBillContent(
                     viewModel = viewModel,
                     modifier = Modifier.padding(innerPadding)
                 )
             }
             is MainScreenState.ViewEvent -> {
+                Log.d(TAG, "Rendering ViewEvent screen for event: ${currentState.eventId}")
                 ViewEventContent(
                     viewModel = viewModel,
                     modifier = Modifier.padding(innerPadding)
@@ -183,13 +204,23 @@ fun EventListContent(
     modifier: Modifier = Modifier
 ) {
     val eventList by viewModel.eventList.collectAsState()
+    Log.d(TAG, "EventListContent composing with ${eventList.size} events")
     
     EventListScreen(
         events = eventList,
-        onEventClick = { eventId -> viewModel.navigateToViewEvent(eventId) },
+        onEventClick = { eventId -> 
+            Log.d(TAG, "Event clicked: $eventId")
+            viewModel.navigateToViewEvent(eventId) 
+        },
         onCreateNewBill = onCreateNewBill,
-        onDeleteEvent = { eventId -> viewModel.deleteEvent(eventId) },
-        onEditEventName = { eventId, newName -> viewModel.updateEventName(eventId, newName) },
+        onDeleteEvent = { eventId -> 
+            Log.d(TAG, "Delete event clicked: $eventId")
+            viewModel.deleteEvent(eventId) 
+        },
+        onEditEventName = { eventId, newName -> 
+            Log.d(TAG, "Edit event name clicked: $eventId -> $newName")
+            viewModel.updateEventName(eventId, newName) 
+        },
         modifier = modifier
     )
 }
@@ -292,3 +323,5 @@ fun ViewEventContent(
         }
     }
 }
+
+private const val TAG = "MainActivity"

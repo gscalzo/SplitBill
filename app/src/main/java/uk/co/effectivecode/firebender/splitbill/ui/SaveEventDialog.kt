@@ -1,5 +1,6 @@
 package uk.co.effectivecode.firebender.splitbill.ui
 
+import android.util.Log
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.res.stringResource
@@ -11,6 +12,7 @@ fun SaveEventDialog(
     onSave: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    Log.d(TAG, "SaveEventDialog composing")
     var eventName by remember { mutableStateOf("") }
     
     AlertDialog(
@@ -27,16 +29,24 @@ fun SaveEventDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onSave(eventName.trim()) },
+                onClick = { 
+                    Log.d(TAG, "Save button clicked with event name: '${eventName.trim()}'")
+                    onSave(eventName.trim()) 
+                },
                 enabled = eventName.trim().isNotEmpty()
             ) {
                 Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = { 
+                Log.d(TAG, "Cancel button clicked")
+                onDismiss() 
+            }) {
                 Text(stringResource(R.string.cancel))
             }
         }
     )
 }
+
+private const val TAG = "SaveEventDialog"

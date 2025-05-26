@@ -1,5 +1,6 @@
 package uk.co.effectivecode.firebender.splitbill.ui
 
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,13 +32,20 @@ fun EventListScreen(
     onEditEventName: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    Log.d(TAG, "EventListScreen composing with ${events.size} events")
+    events.forEach { event ->
+        Log.d(TAG, "Rendering event: ${event.id}, name: ${event.name}")
+    }
+    
     var eventToEdit by remember { mutableStateOf<BillEvent?>(null) }
     var showDeleteDialog by remember { mutableStateOf<BillEvent?>(null) }
     
     Column(modifier = modifier.fillMaxSize()) {
         if (events.isEmpty()) {
+            Log.d(TAG, "Displaying welcome screen - no events")
             WelcomeScreen(modifier = Modifier.weight(1f))
         } else {
+            Log.d(TAG, "Displaying event list with ${events.size} events")
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(16.dp),
@@ -220,3 +228,5 @@ private fun formatDate(timestamp: Long): String {
     val dateFormat = SimpleDateFormat("MMM dd, yyyy 'at' HH:mm", Locale.getDefault())
     return dateFormat.format(Date(timestamp))
 }
+
+private const val TAG = "EventListScreen"
