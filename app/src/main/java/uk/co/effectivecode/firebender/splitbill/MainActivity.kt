@@ -11,8 +11,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,11 +23,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.launch
+import uk.co.effectivecode.firebender.splitbill.data.ReceiptItem
 import uk.co.effectivecode.firebender.splitbill.data.ReceiptParseResult
 import uk.co.effectivecode.firebender.splitbill.service.OpenAIService
 import uk.co.effectivecode.firebender.splitbill.service.ReceiptParsingService
@@ -135,7 +140,8 @@ fun MainApp() {
             parseResult = parseResult,
             isLoading = isLoading,
             errorMessage = errorMessage,
-            onRetry = { showImageSourceDialog = true }
+            onRetry = { showImageSourceDialog = true },
+            onUpdateParseResult = { newResult -> parseResult = newResult }
         )
         
         // Image source chooser dialog
@@ -182,7 +188,8 @@ fun MainScreen(
     parseResult: ReceiptParseResult?,
     isLoading: Boolean,
     errorMessage: String?,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onUpdateParseResult: (ReceiptParseResult) -> Unit
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         when {
@@ -227,7 +234,17 @@ fun MainScreen(
             parseResult != null -> {
                 ReceiptDisplay(
                     modifier = Modifier.padding(16.dp),
-                    result = parseResult
+                    result = parseResult,
+                    onItemUpdated = { index, item -> 
+                        val currentResult = parseResult
+                        currentResult?.let { 
+                            val updatedItems = it.items?.toMutableList()
+                            if (updatedItems != null && index < updatedItems.size) {
+                                updatedItems[index] = item
+                                onUpdateParseResult(it.copy(items = updatedItems))
+                            }
+                        }
+                    }
                 )
             }
             
@@ -263,7 +280,8 @@ fun WelcomeScreen(modifier: Modifier = Modifier) {
 @Composable
 fun ReceiptDisplay(
     modifier: Modifier = Modifier,
-    result: ReceiptParseResult
+    result: ReceiptParseResult,
+    onItemUpdated: (Int, ReceiptItem) -> Unit
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -330,39 +348,11 @@ fun ReceiptDisplay(
                 }
             }
             
-            items(items) { item ->
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = item.name,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            if (item.quantity > 1) {
-                                Text(
-                                    text = "Quantity: ${item.quantity}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Text(
-                            text = "£%.2f".format(item.cost),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
+            itemsIndexed(items) { index, item ->
+                EditableReceiptItem(
+                    item = item,
+                    onItemUpdated = { updatedItem -> onItemUpdated(index, updatedItem) }
+                )
             }
         }
         
@@ -417,6 +407,135 @@ fun ReceiptDisplay(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditableReceiptItem(
+    item: ReceiptItem,
+    onItemUpdated: (ReceiptItem) -> Unit
+) {
+    var isEditing by remember { mutableStateOf(false) }
+    var editedName by remember { mutableStateOf(item.name) }
+    var editedQuantity by remember { mutableStateOf(item.quantity.toString()) }
+    var editedCost by remember { mutableStateOf("%.2f".format(item.cost)) }
+    
+    // Reset editing state when item changes
+    LaunchedEffect(item) {
+        editedName = item.name
+        editedQuantity = item.quantity.toString()
+        editedCost = "%.2f".format(item.cost)
+    }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (isEditing) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                TextField(
+                    value = editedName,
+                    onValueChange = { editedName = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextField(
+                        value = editedQuantity,
+                        onValueChange = { editedQuantity = it },
+                        label = { Text("Quantity") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextField(
+                        value = editedCost,
+                        onValueChange = { editedCost = it },
+                        label = { Text("Cost") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = {
+                            isEditing = false
+                            editedName = item.name
+                            editedQuantity = item.quantity.toString()
+                            editedCost = "%.2f".format(item.cost)
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                    TextButton(
+                        onClick = {
+                            val quantity = editedQuantity.toIntOrNull() ?: item.quantity
+                            val cost = editedCost.toDoubleOrNull() ?: item.cost
+                            val updatedItem = item.copy(
+                                name = editedName.trim(),
+                                quantity = quantity,
+                                cost = cost
+                            )
+                            onItemUpdated(updatedItem)
+                            isEditing = false
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = item.name,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    if (item.quantity > 1) {
+                        Text(
+                            text = "Quantity: ${item.quantity}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "£%.2f".format(item.cost),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    IconButton(
+                        onClick = { isEditing = true }
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Edit Item"
                         )
                     }
                 }

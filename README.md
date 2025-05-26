@@ -30,6 +30,7 @@ A Clean-MVVM Android application for splitting bills using AI-powered receipt pa
 - 🔍 AI-powered receipt parsing using OpenAI gpt-4o-mini
 - 📱 Material Design 3 UI with Jetpack Compose
 - 💰 UK receipt format support with quantity handling
+- ✏️ Inline editing of item names, quantities, and costs
 - 🛡️ Secure API key management via environment variables
 - ⚡ Loading spinner during API calls
 - 🧪 Mock service for testing without API calls
@@ -75,4 +76,3 @@ val receiptService: ReceiptParsingService = remember { OpenAIService(useMock = t
 - Images are compressed (not resized) to balance quality and API token usage
 - All network calls are made asynchronously with proper error handling
 - No sensitive data is logged in production builds
-
