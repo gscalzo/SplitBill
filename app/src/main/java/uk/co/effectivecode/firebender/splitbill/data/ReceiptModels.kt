@@ -112,3 +112,89 @@ data class ResponseMessage(
     @SerializedName("content")
     val content: String
 )
+
+// Domain models for business logic
+data class ReceiptCalculation(
+    val subtotal: Double,
+    val serviceCharge: Double,
+    val expectedTotal: Double,
+    val actualTotal: Double,
+    val hasDiscrepancy: Boolean,
+    val discrepancyAmount: Double
+) {
+    companion object {
+        fun calculate(items: List<ReceiptItem>, serviceCharge: Double, actualTotal: Double): ReceiptCalculation {
+            val subtotal = items.sumOf { it.cost }
+            val expectedTotal = subtotal + serviceCharge
+            val discrepancyAmount = kotlin.math.abs(expectedTotal - actualTotal)
+            val hasDiscrepancy = discrepancyAmount > 0.01
+            
+            return ReceiptCalculation(
+                subtotal = subtotal,
+                serviceCharge = serviceCharge,
+                expectedTotal = expectedTotal,
+                actualTotal = actualTotal,
+                hasDiscrepancy = hasDiscrepancy,
+                discrepancyAmount = discrepancyAmount
+            )
+        }
+    }
+}
+
+data class EditableReceipt(
+    val originalResult: ReceiptParseResult,
+    val items: List<ReceiptItem>,
+    val serviceCharge: Double,
+    val total: Double,
+    val calculation: ReceiptCalculation
+) {
+    companion object {
+        fun fromParseResult(result: ReceiptParseResult): EditableReceipt {
+            val items = result.items ?: emptyList()
+            val serviceCharge = result.service ?: 0.0
+            val total = result.total ?: 0.0
+            val calculation = ReceiptCalculation.calculate(items, serviceCharge, total)
+            
+            return EditableReceipt(
+                originalResult = result,
+                items = items,
+                serviceCharge = serviceCharge,
+                total = total,
+                calculation = calculation
+            )
+        }
+    }
+    
+    fun updateItems(newItems: List<ReceiptItem>): EditableReceipt {
+        val newCalculation = ReceiptCalculation.calculate(newItems, serviceCharge, total)
+        return copy(items = newItems, calculation = newCalculation)
+    }
+    
+    fun updateServiceCharge(newServiceCharge: Double): EditableReceipt {
+        val newCalculation = ReceiptCalculation.calculate(items, newServiceCharge, total)
+        return copy(serviceCharge = newServiceCharge, calculation = newCalculation)
+    }
+    
+    fun updateTotal(newTotal: Double): EditableReceipt {
+        val newCalculation = ReceiptCalculation.calculate(items, serviceCharge, newTotal)
+        return copy(total = newTotal, calculation = newCalculation)
+    }
+    
+    fun addItem(item: ReceiptItem): EditableReceipt {
+        return updateItems(items + item)
+    }
+    
+    fun updateItem(index: Int, item: ReceiptItem): EditableReceipt {
+        if (index < 0 || index >= items.size) return this
+        val newItems = items.toMutableList()
+        newItems[index] = item
+        return updateItems(newItems)
+    }
+    
+    fun deleteItem(index: Int): EditableReceipt {
+        if (index < 0 || index >= items.size) return this
+        val newItems = items.toMutableList()
+        newItems.removeAt(index)
+        return updateItems(newItems)
+    }
+}
