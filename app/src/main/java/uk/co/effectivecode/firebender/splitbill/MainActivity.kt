@@ -338,13 +338,24 @@ fun ReceiptDisplay(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = item.name,
-                            style = MaterialTheme.typography.bodyMedium,
+                        Column(
                             modifier = Modifier.weight(1f)
-                        )
+                        ) {
+                            Text(
+                                text = item.name,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            if (item.quantity > 1) {
+                                Text(
+                                    text = "Quantity: ${item.quantity}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                         Text(
                             text = "£%.2f".format(item.cost),
                             style = MaterialTheme.typography.bodyMedium,

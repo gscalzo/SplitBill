@@ -29,7 +29,7 @@ A Clean-MVVM Android application for splitting bills using AI-powered receipt pa
 - 📷 Camera and gallery integration for receipt capture
 - 🔍 AI-powered receipt parsing using OpenAI gpt-4o-mini
 - 📱 Material Design 3 UI with Jetpack Compose
-- 💰 UK receipt format support
+- 💰 UK receipt format support with quantity handling
 - 🛡️ Secure API key management via environment variables
 - ⚡ Loading spinner during API calls
 - 🧪 Mock service for testing without API calls

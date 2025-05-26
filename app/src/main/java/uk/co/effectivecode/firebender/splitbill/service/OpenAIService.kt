@@ -111,9 +111,18 @@ class OpenAIService(
                                 {"error": "description of why it's not a valid receipt", "items": null, "service": null, "total": null}
                                 
                                 If it IS a valid UK receipt:
-                                {"error": null, "items": [{"name": "item name", "cost": 12.50}], "service": 2.41, "total": 26.61}
+                                {"error": null, "items": [{"name": "Pizza", "quantity": 2, "cost": 20.00}, {"name": "Espresso", "quantity": 3, "cost": 9.00}], "service": 2.90, "total": 31.90}
                                 
-                                Rules:
+                                Rules for parsing items:
+                                - Look for quantity indicators like "2x Pizza", "3 Espresso", "2 × Item"
+                                - If no quantity is specified, default to 1
+                                - The cost should be the TOTAL cost for that quantity
+                                - Examples:
+                                  * "2 Pizza £20" → {"name": "Pizza", "quantity": 2, "cost": 20.00}
+                                  * "Espresso £3" → {"name": "Espresso", "quantity": 1, "cost": 3.00}
+                                  * "3x Coffee £9" → {"name": "Coffee", "quantity": 3, "cost": 9.00}
+                                
+                                General rules:
                                 - Always include all four fields (error, items, service, total)
                                 - Use null for fields that don't apply
                                 - Use British pound values as numbers (e.g., 12.50 not "£12.50")
@@ -148,9 +157,10 @@ class OpenAIService(
                         type = "object",
                         properties = mapOf(
                             "name" to Property(type = "string", description = "Name of the item"),
-                            "cost" to Property(type = "number", description = "Cost of the item")
+                            "quantity" to Property(type = "integer", description = "Quantity of the item (default 1 if not specified)"),
+                            "cost" to Property(type = "number", description = "Total cost for this quantity of the item")
                         ),
-                        required = listOf("name", "cost"),
+                        required = listOf("name", "quantity", "cost"),
                         additionalProperties = false
                     )
                 ),
@@ -172,12 +182,12 @@ class OpenAIService(
     private fun createMockResponse(): ReceiptParseResult {
         return ReceiptParseResult(
             items = listOf(
-                ReceiptItem("Margherita Pizza", 12.50),
-                ReceiptItem("Caesar Salad", 8.75),
-                ReceiptItem("Coca Cola", 2.95)
+                ReceiptItem("Margherita Pizza", 2, 25.00),
+                ReceiptItem("Caesar Salad", 1, 8.75),
+                ReceiptItem("Coca Cola", 3, 8.85)
             ),
-            service = 2.41,
-            total = 26.61
+            service = 4.26,
+            total = 46.86
         )
     }
 }
@@ -192,12 +202,12 @@ class MockReceiptParsingService : ReceiptParsingService {
             Result.success(
                 ReceiptParseResult(
                     items = listOf(
-                        ReceiptItem("Fish & Chips", 8.95),
-                        ReceiptItem("Mushy Peas", 2.50),
-                        ReceiptItem("Tea", 1.80)
+                        ReceiptItem("Fish & Chips", 2, 17.90),
+                        ReceiptItem("Mushy Peas", 1, 2.50),
+                        ReceiptItem("Tea", 2, 3.60)
                     ),
-                    service = 1.33,
-                    total = 14.58
+                    service = 2.40,
+                    total = 26.40
                 )
             )
         }

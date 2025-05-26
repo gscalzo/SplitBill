@@ -16,6 +16,8 @@ data class ReceiptParseResult(
 data class ReceiptItem(
     @SerializedName("name")
     val name: String,
+    @SerializedName("quantity")
+    val quantity: Int = 1,
     @SerializedName("cost")
     val cost: Double
 )
