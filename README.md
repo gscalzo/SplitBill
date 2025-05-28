@@ -45,13 +45,13 @@ A Clean-MVVM Android application for splitting bills using AI-powered receipt pa
 ## Screenshots
 
 <p align="center">
-  <img src="images/Screenshot_1748465225.png" alt="App Screenshot 1" width="250"/>
-  <img src="images/Screenshot_1748465222.png" alt="App Screenshot 2" width="250"/>
-  <img src="images/Screenshot_1748465176.png" alt="App Screenshot 3" width="250"/>
-  <img src="images/Screenshot_1748465168.png" alt="App Screenshot 4" width="250"/>
-  <img src="images/Screenshot_1748465119.png" alt="App Screenshot 5" width="250"/>
-  <img src="images/Screenshot_1748465090.png" alt="App Screenshot 6" width="250"/>
   <img src="images/Screenshot_1748465067.png" alt="App Screenshot 7" width="250"/>
+  <img src="images/Screenshot_1748465090.png" alt="App Screenshot 6" width="250"/>
+  <img src="images/Screenshot_1748465119.png" alt="App Screenshot 5" width="250"/>
+  <img src="images/Screenshot_1748465168.png" alt="App Screenshot 4" width="250"/>
+  <img src="images/Screenshot_1748465176.png" alt="App Screenshot 3" width="250"/>
+  <img src="images/Screenshot_1748465222.png" alt="App Screenshot 2" width="250"/>
+  <img src="images/Screenshot_1748465225.png" alt="App Screenshot 1" width="250"/>
 </p>
 
 ---
