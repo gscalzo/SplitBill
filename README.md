@@ -38,7 +38,6 @@ A Clean-MVVM Android application for splitting bills using AI-powered receipt pa
 - 👥 **Participant management** and local persistence
 - ➗ **Flexible split modes**: equal or manual assignment
 - ✅ **Payment tracking** and event history
-- 📤 **Shareable text summaries** for WhatsApp/SMS
 
 ---
 
@@ -87,8 +86,7 @@ A Clean-MVVM Android application for splitting bills using AI-powered receipt pa
 3. **Edit the parsed list** if needed—change item names, costs, or quantities.
 4. **Add/select participants** and assign items (split equally or manually).
 5. **Track payments**—each person marks their share as paid, with optional notes.
-6. **View event history**—see settled/unsettled bills, reopen and edit any event.
-7. **Share a summary** via WhatsApp/SMS.
+6. **View event history**—see settled/unsettled bills.
 
 ---
 
@@ -108,7 +106,6 @@ A Clean-MVVM Android application for splitting bills using AI-powered receipt pa
 - API keys are stored in `.env` files (excluded from git)
 - Images are compressed (not resized) to balance quality and API token usage
 - All network calls are asynchronous with robust error handling
-- No sensitive data is logged in production builds
 
 ---
 
