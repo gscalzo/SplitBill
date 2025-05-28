@@ -17,3 +17,9 @@ local.properties
 
 # Environment variables
 .env
+
+.idea/
+.vscode/
+
+.idea/
+.vscode/
